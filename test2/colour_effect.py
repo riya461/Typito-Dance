@@ -6,7 +6,7 @@ from moviepy.editor import VideoFileClip
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-# Initialize global variables to store previous landmarks
+# store previous landmarks
 prev_left_hand = None
 prev_right_hand = None
 prev_left_leg = None
@@ -26,7 +26,7 @@ def apply_color_effect(frame, effect):
     return frame
 
 def detect_movement(current_landmarks, prev_landmarks):
-    movement_threshold = 0.02  # Threshold to consider as movement
+    movement_threshold = 0.02  # to consider as movement
     if prev_landmarks is None:
         return False
 
@@ -35,7 +35,6 @@ def detect_movement(current_landmarks, prev_landmarks):
             return True
     return False
 
-# Main function to process the video
 def main():
     global prev_left_hand, prev_right_hand, prev_left_leg, prev_right_leg
 
@@ -92,7 +91,7 @@ def main():
                 'right_leg': right_leg_landmarks
             }
 
-            print(landmarks)  # Example of printing, adjust as needed
+            # print(landmarks)
 
             # Update previous landmarks
             prev_left_hand = left_hand_landmarks
