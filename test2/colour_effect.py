@@ -6,34 +6,72 @@ from moviepy.editor import VideoFileClip
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-# store previous landmarks
+# Store previous landmarks
 prev_left_hand = None
 prev_right_hand = None
 prev_left_leg = None
 prev_right_leg = None
 
+def zoom_and_pan(frame, effect):
+    h, w, _ = frame.shape
+    zoom_factor = 0.1  # Adjust this value to control zoom level
+    pan_factor = 0.1   # Adjust this value to control panning distance
+
+    # Calculate cropping dimensions
+    crop_w = int(w * (1 - zoom_factor))
+    crop_h = int(h * (1 - zoom_factor))
+
+    if effect in ['blue', 'red']:  # Pan left
+        start_x = int(w * pan_factor)
+    elif effect in ['green', 'yellow']:  # Pan right
+        start_x = int(w * (1 - pan_factor - (1 - zoom_factor)))
+    else:
+        start_x = (w - crop_w) // 2  # Center
+
+    start_y = (h - crop_h) // 2  # Center vertically
+
+    # Crop the frame
+    cropped_frame = frame[start_y:start_y + crop_h, start_x:start_x + crop_w]
+
+    # Resize back to original dimensions
+    zoomed_frame = cv2.resize(cropped_frame, (w, h))
+
+    return zoomed_frame
+
 def apply_color_effect(frame, effect):
     intensity = 0.5
     if effect == 'blue':
+        # left hand 
         frame[:, :, 0] = frame[:, :, 0] * intensity
     elif effect == 'green':
+        # right hand
         frame[:, :, 1] = frame[:, :, 1] * intensity
     elif effect == 'red':
+        # left leg
         frame[:, :, 2] = frame[:, :, 2] * intensity
     elif effect == 'yellow':
+        # right leg
         frame[:, :, 0] = frame[:, :, 0] * intensity
         frame[:, :, 1] = frame[:, :, 1] * intensity
     return frame
 
-def detect_movement(current_landmarks, prev_landmarks):
-    movement_threshold = 0.02  # to consider as movement
-    if prev_landmarks is None:
-        return False
+def distance(x1, y1, x2, y2):
+    return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
 
+def detect_movement(current_landmarks, prev_landmarks):
+    movement_threshold = 0.05  # Threshold to consider as movement
+    if prev_landmarks is None:
+        return 0
+
+    total_distance = 0
     for curr, prev in zip(current_landmarks, prev_landmarks):
-        if abs(curr[0] - prev[0]) > movement_threshold or abs(curr[1] - prev[1]) > movement_threshold:
-            return True
-    return False
+        total_distance += distance(curr[0], curr[1], prev[0], prev[1])
+
+    average_distance = total_distance / len(current_landmarks)
+    if average_distance > movement_threshold:
+        return average_distance
+    else:
+        return 0
 
 def main():
     global prev_left_hand, prev_right_hand, prev_left_leg, prev_right_leg
@@ -67,31 +105,28 @@ def main():
             pose_landmarks = results.pose_landmarks.landmark
 
             # Extract specific landmarks for annotation
-            left_hand_landmarks = [(pose_landmarks[i].x, pose_landmarks[i].y, pose_landmarks[i].z) for i in [14, 16]]
-            right_hand_landmarks = [(pose_landmarks[i].x, pose_landmarks[i].y, pose_landmarks[i].z) for i in [13, 15]]
-            left_leg_landmarks = [(pose_landmarks[i].x, pose_landmarks[i].y, pose_landmarks[i].z) for i in [26, 28]]
-            right_leg_landmarks = [(pose_landmarks[i].x, pose_landmarks[i].y, pose_landmarks[i].z) for i in [25, 27]]
+            left_hand_landmarks = [(pose_landmarks[i].x, pose_landmarks[i].y, pose_landmarks[i].z) for i in [15, 17]]
+            right_hand_landmarks = [(pose_landmarks[i].x, pose_landmarks[i].y, pose_landmarks[i].z) for i in [16, 18]]
+            left_leg_landmarks = [(pose_landmarks[i].x, pose_landmarks[i].y, pose_landmarks[i].z) for i in [25, 27]]
+            right_leg_landmarks = [(pose_landmarks[i].x, pose_landmarks[i].y, pose_landmarks[i].z) for i in [26, 28]]
 
             # Detect movement and apply color effects
-            if detect_movement(left_hand_landmarks, prev_left_hand):
-                image = apply_color_effect(image, 'blue')
-            if detect_movement(right_hand_landmarks, prev_right_hand):
-                image = apply_color_effect(image, 'green')
-            if detect_movement(left_leg_landmarks, prev_left_leg):
-                image = apply_color_effect(image, 'red')
-            if detect_movement(right_leg_landmarks, prev_right_leg):
-                image = apply_color_effect(image, 'yellow')
+            left_hand_movement = detect_movement(left_hand_landmarks, prev_left_hand)
+            right_hand_movement = detect_movement(right_hand_landmarks, prev_right_hand)
+            left_leg_movement = detect_movement(left_leg_landmarks, prev_left_leg)
+            right_leg_movement = detect_movement(right_leg_landmarks, prev_right_leg)
 
-            # Log landmarks
-            landmarks = {
-                'frame_index': frame_index,
-                'left_hand': left_hand_landmarks,
-                'right_hand': right_hand_landmarks,
-                'left_leg': left_leg_landmarks,
-                'right_leg': right_leg_landmarks
-            }
+            movement_array = [left_hand_movement, right_hand_movement, left_leg_movement, right_leg_movement]
 
-            # print(landmarks)
+            # Apply color effects
+            max_movement = max(movement_array)
+            index = movement_array.index(max_movement)
+
+            if max_movement > 0:
+                effects = ['blue', 'green', 'red', 'yellow']
+                effect = effects[index]
+                image = zoom_and_pan(image, effect)
+                # image = apply_color_effect(image, effect)
 
             # Update previous landmarks
             prev_left_hand = left_hand_landmarks
@@ -104,8 +139,8 @@ def main():
 
         return image  # Return annotated frame
 
-    video = 'hip_hop_1.mp4'
-    out_video = 'hip_hop_1_final.mp4'
+    video = 'illuminati_1.mp4'
+    out_video = 'illuminati_1_final.mp4'
     scale_percent = 50
     clip = VideoFileClip(video)
     fps = clip.fps
@@ -118,7 +153,7 @@ def main():
     processed_clip = clip.fl(process_frame, apply_to=['video'])
 
     # Save the processed video
-    processed_clip.write_videofile(out_video, codec='libx264')
+    processed_clip.write_videofile(out_video, codec='libx264', fps=50)
 
     # Release the holistic model
     mp_holistic.close()
