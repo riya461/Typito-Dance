@@ -1,0 +1,1 @@
+- applying effect if movemment forward 

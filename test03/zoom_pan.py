@@ -139,8 +139,8 @@ def main():
 
         return image  # Return annotated frame
 
-    video = 'illuminati_1.mp4'
-    out_video = 'illuminati_1_final.mp4'
+    video = '../inputs/hip_hop_1.mp4'
+    out_video = 'hip_hop_1_01.mp4'
     scale_percent = 50
     clip = VideoFileClip(video)
     fps = clip.fps
